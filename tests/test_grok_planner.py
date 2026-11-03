@@ -33,62 +33,20 @@ def response(data):
 
 
 class GrokPlannerTests(unittest.TestCase):
-    def test_http_schema_to_intent_to_cyberwave_plan(self):
-        requests = []
-
-        def handle(request):
-            requests.append(request)
-            return httpx.Response(200, json=response(intent()))
-
-        with patch.dict(os.environ, ENV), patch.object(grok_planner.httpx, "Client", side_effect=lambda **kw: Client(transport=httpx.MockTransport(handle), **kw)):
-            result = grok_planner.preview(PHRASE, mock_state=True)
-        request = requests[0]
-        body = json.loads(request.content)
-        self.assertEqual(str(request.url), "https://api.x.ai/v1/chat/completions")
-        self.assertEqual(request.headers["authorization"], "Bearer test-placeholder")
-        self.assertEqual(body["model"], "test-model")
-        self.assertEqual(body["reasoning_effort"], "none")
-        self.assertEqual(body["messages"][-1]["content"], PHRASE)
-        self.assertTrue(body["response_format"]["json_schema"]["strict"])
-        self.assertNotIn("tools", body)
-        self.assertEqual(result["status"], "resolved_mock")
-        self.assertEqual(result["state_source"], "mock")
-        self.assertEqual([(c["joint"], c["before"], c["target"], c["delta"]) for c in result["parameter_changes"]], [
-            ("shoulder_pan", 15, 70, 55), ("elbow_flex", -20, -10, 10),
-        ])
-        self.assertEqual([(a["joint"], a["angle"]) for a in result["motion_plan"]["actions"]], [("1", 70), ("3", -10)])
-        self.assertTrue(all(a["type"] == "set_joint" for a in result["motion_plan"]["actions"]))
-        self.assertEqual(result["executed_actions"], 0)
 
     def test_no_state_retains_interpretation_without_numeric_targets(self):
         result = grok_planner.resolve(intent())
-        self.assertEqual(result["status"], "needs_configuration")
+        self.assertEqual(result["status"], "planned")
         self.assertEqual(len(result["proposed_actions"]), 2)
         self.assertEqual(result["parameter_changes"], [])
         self.assertIsNone(result["motion_plan"])
 
-    def test_sequential_moves_use_preceding_simulated_target(self):
-        result = grok_planner.resolve(intent([action(), action()]), mock_state=True)
-        self.assertEqual([(c["before"], c["target"]) for c in result["parameter_changes"]], [(-20, -10), (-10, 0)])
 
-    def test_out_of_range_blocks_whole_plan_without_clamping(self):
-        result = grok_planner.resolve(intent([
-            action("endpoint", "shoulder_pan", "right"), action("relative", amount=100),
-        ]), mock_state=True)
-        self.assertEqual(result["status"], "needs_configuration")
-        self.assertIsNone(result["motion_plan"])
-        self.assertEqual(result["code_preview"], [])
-        self.assertIn("exceed", result["unresolved"][0])
 
-    def test_named_pose_is_not_replaced_with_shoulder_limit(self):
-        result = grok_planner.resolve(intent([action("pose", None, None, pose="top")]), mock_state=True)
-        self.assertIsNone(result["motion_plan"])
-        self.assertEqual(result["parameter_changes"], [])
-        self.assertIn("not configured", result["unresolved"][0])
 
     def test_stop_is_not_home(self):
-        result = grok_planner.resolve(intent([action("stop", None, None)]), mock_state=True)
-        self.assertEqual(result["status"], "preview_only")
+        result = grok_planner.resolve(intent([action("stop", None, None)]))
+        self.assertEqual(result["status"], "planned")
         self.assertIsNone(result["motion_plan"])
         self.assertEqual(result["executed_actions"], 0)
 
@@ -99,12 +57,12 @@ class GrokPlannerTests(unittest.TestCase):
                         [action(direction="right")],
                         [action("stop", None, None), action()]):
             with self.subTest(actions=actions), self.assertRaises(ValueError):
-                grok_planner.resolve(intent(actions), mock_state=True)
+                grok_planner.resolve(intent(actions))
         with self.assertRaises(ValueError):
-            grok_planner.resolve(intent([action()], status="clarify"), mock_state=True)
+            grok_planner.resolve(intent([action()], status="clarify"))
 
     def test_clarification_never_produces_motion_plan(self):
-        result = grok_planner.resolve(intent([], status="clarify"), mock_state=True)
+        result = grok_planner.resolve(intent([], status="clarify"))
         self.assertEqual(result["status"], "clarify")
         self.assertIsNone(result["motion_plan"])
 
@@ -133,7 +91,7 @@ class GrokPlannerTests(unittest.TestCase):
     def test_voice_transcript_reaches_grok_adapter_and_resolver(self):
         recorder = Mock(recording=True)
         recorder.stop.return_value = Path("mock.wav")
-        session = voice_toggle.Session(recorder, processor=lambda text: grok_planner.preview(text, mock_state=True))
+        session = voice_toggle.Session(recorder, processor=grok_planner.preview)
         with patch.object(voice_toggle.readiness, "transcribe", return_value={"text": PHRASE}), \
              patch.object(grok_planner, "interpret", return_value=intent()) as llm, \
              contextlib.redirect_stdout(io.StringIO()) as output:
@@ -141,10 +99,10 @@ class GrokPlannerTests(unittest.TestCase):
             session.worker.join(timeout=2)
             recorder.recording = False
             session.poll()
-        llm.assert_called_once_with(PHRASE)
-        self.assertIn('"target": 70', output.getvalue())
+        llm.assert_called_once_with(PHRASE, paired=False, default_arm="both")
+        self.assertNotIn('"target":', output.getvalue())
         self.assertIn('"joint": "elbow_flex"', output.getvalue())
-        self.assertIn('"state_source": "mock"', output.getvalue())
+        self.assertIn('"mode": "intent_only"', output.getvalue())
         self.assertIn('"executed_actions": 0', output.getvalue())
 
     def test_planner_failure_preserves_transcript_and_returns_ready(self):
@@ -161,3 +119,36 @@ class GrokPlannerTests(unittest.TestCase):
         self.assertIn('"status": "planner_failed"', output.getvalue())
         self.assertIn("READY", output.getvalue())
         self.assertFalse(session.busy)
+
+
+class IntentOutputTests(unittest.TestCase):
+    def test_http_schema_preserves_order_without_inventing_motor_targets(self):
+        requests = []
+        def handle(request):
+            requests.append(request)
+            return httpx.Response(200, json=response(intent()))
+        with patch.dict(os.environ, ENV), patch.object(grok_planner.httpx, "Client", side_effect=lambda **kw: Client(transport=httpx.MockTransport(handle), **kw)):
+            result = grok_planner.preview(PHRASE)
+        body = json.loads(requests[0].content)
+        self.assertEqual(body["messages"][-1]["content"], PHRASE)
+        self.assertTrue(body["response_format"]["json_schema"]["strict"])
+        self.assertNotIn("tools", body)
+        self.assertEqual(result["proposed_actions"], intent()["actions"])
+        self.assertEqual(result["mode"], "intent_only")
+        self.assertIsNone(result["motion_plan"])
+        self.assertEqual(result["parameter_changes"], [])
+        self.assertEqual(result["executed_actions"], 0)
+
+    def test_both_arm_intent_survives_without_physical_configuration(self):
+        data = intent([{**action("relative", "shoulder_pan", "left", 5), "arm": "both"}])
+        with patch.dict(os.environ, ENV), patch.object(grok_planner.httpx, "Client", side_effect=lambda **kw: Client(transport=httpx.MockTransport(lambda request: httpx.Response(200, json=response(data))), **kw)):
+            result = grok_planner.preview("both arms 5 degrees left", paired=True)
+        self.assertEqual(result["proposed_actions"][0]["arm"], "both")
+        self.assertEqual(result["proposed_actions"][0]["amount_degrees"], 5)
+        self.assertIsNone(result["motion_plan"])
+
+    def test_named_pose_is_only_a_name_without_a_stored_position(self):
+        result = grok_planner.resolve(intent([action("pose", None, None, pose="top")]))
+        self.assertEqual(result["proposed_actions"][0]["pose"], "top")
+        self.assertEqual(result["parameter_changes"], [])
+        self.assertIsNone(result["motion_plan"])

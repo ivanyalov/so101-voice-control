@@ -39,7 +39,7 @@ def preview(text: str) -> dict:
             result["status"] = "unsupported_command"
             result["unresolved"] = [
                 "The local helper supports left/right/up/down, stop, and sequences joined by 'then'. "
-                "Use agent-preview for general language; no partial command was planned."
+                "Use grok-preview for general language; no partial command was planned."
             ]
             return result
 

@@ -1,9 +1,8 @@
-"""Local speech and non-invasive hardware preparation. No servo writes."""
+"""Local speech, transcription, synthesis and camera checks."""
 
 from __future__ import annotations
 
 import json
-import math
 import os
 from pathlib import Path
 import re
@@ -13,64 +12,6 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-JOINTS = ("shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper")
-
-
-def list_ports() -> list[dict]:
-    """Enumerate OS port metadata only. Never open or probe a serial port."""
-    from serial.tools import list_ports as serial_ports
-
-    return [
-        {"device": p.device, "description": p.description, "vid": p.vid, "pid": p.pid}
-        for p in sorted(serial_ports.comports(), key=lambda item: item.device)
-    ]
-
-
-def profile_report(path: Path) -> dict:
-    """Validate supplied configuration; this does not establish physical readiness."""
-    data = json.loads(path.read_text())
-    missing = []
-    if data.get("motor_setup_confirmed") is not True:
-        missing.append("motor_setup_confirmed")
-    for field in ("port", "robot_id", "driver_version", "calibration_file"):
-        if not isinstance(data.get(field), str) or not data[field].strip():
-            missing.append(field)
-    calibration = data.get("calibration_file")
-    if isinstance(calibration, str) and calibration:
-        calibration_path = Path(calibration).expanduser()
-        if not calibration_path.is_absolute():
-            calibration_path = ROOT / calibration_path
-        if not calibration_path.is_file():
-            missing.append("calibration_file does not exist")
-    joints = data.get("joints", {})
-    if not isinstance(joints, dict):
-        joints = {}
-    ids = []
-    for name in JOINTS:
-        joint = joints.get(name, {})
-        if not isinstance(joint, dict):
-            missing.append(f"joints.{name}")
-            continue
-        motor_id = joint.get("id")
-        if type(motor_id) is not int or not 1 <= motor_id <= 253:
-            missing.append(f"joints.{name}.id")
-        else:
-            ids.append(motor_id)
-        if joint.get("unit") not in ("degrees", "normalized_0_100", "normalized_m100_100"):
-            missing.append(f"joints.{name}.unit")
-        bounds = [joint.get("min"), joint.get("max")]
-        if not all(type(v) in (int, float) and math.isfinite(v) for v in bounds) or bounds[0] >= bounds[1]:
-            missing.append(f"joints.{name}.bounds")
-    if len(ids) != len(set(ids)):
-        missing.append("duplicate motor IDs")
-    return {
-        "configuration_complete": not missing,
-        "physical_validation_performed": False,
-        "missing_or_invalid": missing,
-        "servo_connection_opened": False,
-    }
-
-
 def _run(args: list[str], timeout: int = 120) -> None:
     result = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
     if result.returncode:
@@ -154,12 +95,16 @@ def speech_smoke() -> dict:
 
 def camera_snapshot(index: int) -> dict:
     import cv2
-    from vision import open_camera
 
     output = ROOT / ".cache/camera" / f"snapshot-{time.time_ns()}.jpg"
     output.parent.mkdir(parents=True, exist_ok=True)
-    with open_camera(index) as camera:
-        frame = camera.grab_frame()
-        if frame is None or not cv2.imwrite(str(output), frame):
+    camera = cv2.VideoCapture(index)
+    try:
+        if not camera.isOpened():
+            raise RuntimeError("Camera could not be opened")
+        ok, frame = camera.read()
+        if not ok or frame is None or not cv2.imwrite(str(output), frame):
             raise RuntimeError("Camera did not produce a writable frame")
-        return {"image": str(output), "width": frame.shape[1], "height": frame.shape[0], "cloud_calls": 0, "robot_calls": 0}
+        return {"image": str(output), "width": frame.shape[1], "height": frame.shape[0], "cloud_calls": 0}
+    finally:
+        camera.release()

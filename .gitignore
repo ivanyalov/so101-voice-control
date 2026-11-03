@@ -19,3 +19,6 @@ vendor/**/.env
 
 # Private credential export for manual transfer.
 /out/*_so101.env
+
+# Local history and hardware materials; excluded from the voice repository.
+/_old/

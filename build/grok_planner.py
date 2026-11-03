@@ -1,6 +1,6 @@
-"""Grok intent adapter, followed by local resolution into Cyberwave MotionPlans.
+"""Grok structured intent adapter for the voice system.
 
-No executor or robot transport is imported. Vendor source stays unmodified.
+Returns semantic commands only; no hardware state, presets or motor targets.
 """
 
 from __future__ import annotations
@@ -9,14 +9,8 @@ import json
 import copy
 import math
 import os
-from pathlib import Path
-import sys
 
 import httpx
-
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "vendor/cyberwave_nl_arm"))
-from motion import Action, MotionPlan, validate_plan
 
 DIRECTIONS = {
     "shoulder_pan": ("left", "right"),
@@ -149,8 +143,8 @@ Every action must have arm='leader', 'follower', or 'both'.
 Explicit 'leader and follower', 'both arms' means arm='both', NOT unsupported.
 If no arm is specified use arm='{default_arm}'; preserve it through subsequent 'then' actions.
 Plain 'move the arm left/right' means rotate shoulder_pan, not Cartesian translation.
-Direction is from the operator standing behind the arm, behind its controller board; local configuration
-maps this to each motor. Do not invent that mapping or numeric target angles.
+Preserve directional words as semantic intent. The downstream integration must define
+the physical viewpoint and motor mapping. Do not invent either or numeric target angles.
 For 'both arms 5 degrees left then 30 degrees right', return two relative actions,
 each with arm='both', joint='shoulder_pan', and the explicitly requested amount.
 Do not claim the motors are enabled or that any movement succeeded.
@@ -200,78 +194,17 @@ Do not claim the motors are enabled or that any movement succeeded.
         raise ValueError("Grok returned an incomplete response envelope; no actions executed.") from None
 
 
-def resolve(intent: dict, *, mock_state: bool = False) -> dict:
-    """Resolve only against an explicitly marked mock fixture for now.
-
-    Hardware observation/trajectory validation are deliberately not implemented.
-    """
-    intent = parse_intent(json.dumps(intent))
-    result = {
-        "mode": "dry_run", "planner": "grok", "model": os.getenv("XAI_MODEL"),
-        "state_source": "mock" if mock_state else "unavailable",
-        "status": intent["status"], "reply": intent["reply"],
-        "proposed_actions": intent["actions"], "parameter_changes": [],
-        "motion_plan": None, "code_preview": [], "unresolved": [],
-        "executed_actions": 0,
+def resolve(intent: dict) -> dict:
+    """Expose validated semantic commands without calculating motor targets."""
+    paired = any("arm" in a for a in intent.get("actions", []))
+    intent = parse_intent(json.dumps(intent), paired=paired)
+    return {
+        "mode": "intent_only", "planner": "grok", "model": os.getenv("XAI_MODEL"),
+        "state_source": "unavailable", "status": intent["status"],
+        "reply": intent["reply"], "proposed_actions": intent["actions"],
+        "parameter_changes": [], "motion_plan": None, "executed_actions": 0,
     }
-    if intent["status"] != "planned":
-        return result
-    if intent["actions"][0]["type"] == "stop":
-        result.update(status="preview_only", unresolved=["Cancellation requested; no executor is connected, so a physical stop cannot be confirmed."])
-        return result
-    if not mock_state:
-        result.update(status="needs_configuration", unresolved=[
-            "Intent interpreted; numeric targets need measured positions and verified joint directions, units, limits and jog settings.",
-            "Use --mock-state only for a clearly labelled numeric preview; no hardware state was read.",
-        ])
-        return result
-
-    bundle = json.loads((ROOT / "inputs/mock/2026-10-27_joint-state.json").read_text())
-    if bundle.get("source") != "mock":
-        raise ValueError("Expected mock fixture")
-    positions = dict(bundle["positions"])
-    plan = MotionPlan(say=intent["reply"])
-    for index, action in enumerate(intent["actions"], 1):
-        joint, direction = action["joint"], action["direction"]
-        if action["type"] == "pose":
-            result["unresolved"].append(f"Named pose {action['pose']!r} is not configured; no joint endpoint was substituted.")
-            continue
-        config = bundle["joints"][joint]
-        before = positions[joint]
-        sign = config["direction_sign"][direction]
-        low, high, step, duration = (config[k] for k in ("min", "max", "jog_step", "duration"))
-        if not all(finite(v) for v in (before, low, high, step, duration)) or sign not in {-1, 1} or not low <= before <= high or low >= high or step <= 0 or not 0 < duration <= 5:
-            raise ValueError("Invalid mock joint configuration")
-        if action["type"] == "endpoint":
-            target = high if sign == 1 else low
-        else:
-            amount = step if action["type"] == "jog" else action["amount_degrees"]
-            target = before + sign * amount
-        if not finite(target) or not low <= target <= high:
-            result["unresolved"].append(f"Step {index} would exceed the configured {joint} range; no clamping or partial plan.")
-            continue
-        positions[joint] = target  # Sequential simulation, never a measured result.
-        result["parameter_changes"].append({
-            "step": index, "joint": joint, "joint_id": config["id"],
-            "before": before, "target": target, "delta": target - before,
-            "unit": "degrees", "duration_seconds": duration,
-        })
-        plan.actions.append(Action(type="set_joint", joint=str(config["id"]), angle=target, duration=duration))
-    if result["unresolved"]:
-        result["status"] = "needs_configuration"
-        return result
-    errors = validate_plan(plan)
-    if errors:
-        raise ValueError("Resolved plan failed Cyberwave validation")
-    result["motion_plan"] = {"say": plan.say, "actions": [vars(a) for a in plan.actions]}
-    result["code_preview"] = [
-        f"# MOCK ONLY: robot.joints.set({a.joint!r}, {a.angle:g}, degrees=True)"
-        for a in plan.actions
-    ]
-    result["status"] = "resolved_mock"
-    result["validation"] = "Mock joint limits and Cyberwave plan shape checked; physical geometry, collisions and tracking not validated."
-    return result
 
 
-def preview(text: str, *, mock_state: bool = False) -> dict:
-    return resolve(interpret(text), mock_state=mock_state)
+def preview(text: str, *, paired: bool = False, default_arm: str = "both") -> dict:
+    return resolve(interpret(text, paired=paired, default_arm=default_arm))

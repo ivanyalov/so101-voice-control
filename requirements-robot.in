@@ -1,4 +1,0 @@
-# Bus diagnostics and bounded direct control, matching the team's package.
-# Full LeRobot/torch installation is separate from this read-only probe.
-feetech-servo-sdk==1.0.0
-pyserial==3.5

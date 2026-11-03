@@ -1,4 +1,4 @@
-"""Toggle local capture, then interpret/resolve; explicit hardware mode is opt-in."""
+"""Toggle local capture, transcribe with Whisper and interpret commands with Grok."""
 
 from __future__ import annotations
 
@@ -226,41 +226,28 @@ class Session:
         self.ready()
 
 
-def run(*, terminal: bool = False, max_seconds: float = 30, planner: str = "grok", mock_state: bool = False,
-        robot: str | None = None, execute: bool = False) -> int:
-    if execute and not robot or robot and (mock_state or planner != "grok"):
-        raise ValueError("Hardware requires Grok, --robot and no --mock-state; --execute is explicit")
-    controller = None
+def run(*, terminal: bool = False, max_seconds: float = 30, planner: str = "grok",
+        paired: bool = False, default_arm: str = "both") -> int:
     if planner == "grok":
         import grok_planner
-
         try:
             model = grok_planner.configured_model()
         except ValueError as exc:
             print(str(exc), flush=True)
             return 1
-
-        if robot:
-            from robot_control import Controller
-            controller = Controller(execute=execute, default_arm="both" if robot == "pair" else robot)
-
         def processor(text):
-            print("TRANSCRIBED. Interpreting with Grok, then resolving targets...", flush=True)
-            return controller.process(text) if controller else grok_planner.preview(text, mock_state=mock_state)
+            print("TRANSCRIBED. Interpreting with Grok...", flush=True)
+            return grok_planner.preview(text, paired=paired, default_arm=default_arm)
     else:
-        if mock_state:
-            raise ValueError("--mock-state requires --planner grok")
         processor = command_preview.preview
     readiness.resolve_model()
     stamp = datetime.now(ZoneInfo("Asia/Hong_Kong")).strftime("%Y-%m-%d_%H-%M-%S")
     log = TurnLog(readiness.ROOT / ".cache/logs" / f"{stamp}_voice-{time.time_ns()}.jsonl")
     log.write("session_started", planner=planner, model=model if planner == "grok" else None,
-              state_source="measured" if robot else "mock" if mock_state else "unavailable",
-              robot=robot, execute=execute, max_seconds=max_seconds,
+              state_source="unavailable", paired=paired, default_arm=default_arm, max_seconds=max_seconds,
               source_file=str(Path(__file__).resolve()))
     recorder = Recorder(max_seconds)
-    session = Session(recorder, processor=processor, log=log,
-                      on_start=controller.cancel.clear if controller else None)
+    session = Session(recorder, processor=processor, log=log)
     events = queue.Queue()
     listener = None
 
@@ -272,14 +259,8 @@ def run(*, terminal: bool = False, max_seconds: float = 30, planner: str = "grok
                 events.put("quit")
                 return
             if value.strip().lower() in {"quit", "exit", "q"}:
-                if controller:
-                    controller.stop()
                 events.put("quit")
                 return
-            if controller and value.strip().lower() == "stop":
-                controller.stop()
-                events.put("stop")
-                continue
             # Global shortcuts may also leave characters in this terminal.
             # Enter must still toggle even when the input buffer is nonempty.
             events.put("toggle")
@@ -303,12 +284,8 @@ def run(*, terminal: bool = False, max_seconds: float = 30, planner: str = "grok
                 print(f"Global shortcut unavailable ({type(exc).__name__}). Using Enter instead.", flush=True)
         print("Enter: start/stop recording in this terminal. Type quit or press Ctrl+C to exit.", flush=True)
         if planner == "grok":
-            print(f"Local Whisper -> Grok ({model}) -> target resolution. API requests may incur charges.", flush=True)
-            if robot:
-                print(f"{'LIVE EXECUTION' if execute else 'HARDWARE PREVIEW (no motor writes)'}; real measured state; default target: {robot}.", flush=True)
-                print("Type stop + Enter to cancel immediately, without Whisper/Grok. Ctrl+C also cancels. Motors hold after movement.", flush=True)
-            else:
-                print(f"DRY RUN; state source: {'MOCK' if mock_state else 'unavailable'}. No robot executor.", flush=True)
+            print(f"Local Whisper -> Grok ({model}) -> structured command JSON. API requests may incur charges.", flush=True)
+            print("Intent output only. No motor controller is connected.", flush=True)
         else:
             print("Local Whisper + basic phrase helper. No LLM/API or robot.", flush=True)
         print(f"Auto-stop recording after {max_seconds:g}s.", flush=True)
@@ -331,30 +308,13 @@ def run(*, terminal: bool = False, max_seconds: float = 30, planner: str = "grok
                 continue
             if event == "quit":
                 break
-            if event == "stop":
-                if recorder.recording:
-                    recorder.cancel()
-                session.event("operator_stop")
-                print("STOP requested. Pending motion cancelled; waiting for any active worker to stop/hold.", flush=True)
-                if not session.busy:
-                    session.ready()
-                continue
             session.toggle()
     except KeyboardInterrupt:
         pass
     finally:
-        if controller:
-            controller.stop()
         if recorder.recording:
             session.event("recording_discarded")
         recorder.cancel()
-        if controller and session.worker and session.worker.is_alive():
-            print("Waiting for active processing to stop/hold...", flush=True)
-            session.worker.join(timeout=35)
-            if session.worker.is_alive():
-                print("Worker still stopping; physical hold is not yet confirmed.", flush=True)
-            else:
-                session.poll()
         if listener is not None:
             listener.stop()
         log.write("session_stopped")
