@@ -1,0 +1,13 @@
+# SDK and example are pinned to the same reviewed upstream revision.
+cyberwave @ git+https://github.com/cyberwave-os/cyberwave-python.git@85937673a4ef45bedffefb2af2047851d81ae5ed
+anthropic>=0.40.0
+httpx>=0.28.1
+numpy>=1.26
+sounddevice>=0.5.2
+soundfile>=0.12.1
+pynput>=1.7.7
+python-dotenv>=1.0
+opencv-python-headless>=4.10,<5
+pyserial>=3.5,<4
+feetech-servo-sdk==1.0.0
+

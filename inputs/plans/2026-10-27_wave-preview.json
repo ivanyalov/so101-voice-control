@@ -1,0 +1,7 @@
+{
+  "say": "Previewing a small wave. These are example targets, not calibrated for our arm.",
+  "actions": [
+    {"type": "set_joint", "joint": "1", "angle": 15, "duration": 1},
+    {"type": "set_joint", "joint": "1", "angle": -15, "duration": 1}
+  ]
+}

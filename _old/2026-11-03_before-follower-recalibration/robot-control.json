@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "direction_viewpoint": "Operator standing behind the arm, behind its controller board; confirmed by Ivan 2026-11-03",
+  "status": "follower_live_direction_calibration_in_progress",
+  "arms": {
+    "follower": {
+      "serial": "5B91026201",
+      "calibration_file": "inputs/2026-11-03_so101-robot-env/calibration/so101_follower.json",
+      "joints": {}
+    },
+    "leader": {
+      "serial": "5B91027464",
+      "calibration_file": "inputs/2026-11-03_so101-robot-env/calibration/so101_leader.json",
+      "joints": {}
+    }
+  },
+  "joint_configuration_example": {
+    "note": "Add under each arm's joints only after physical verification; never copy mock signs.",
+    "shoulder_pan": {
+      "verified": false,
+      "direction_sign": {
+        "left": null,
+        "right": null
+      }
+    }
+  }
+}

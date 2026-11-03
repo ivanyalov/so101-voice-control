@@ -1,0 +1,19 @@
+{
+  "status": "awaiting_team_zip",
+  "robot_type": "so101_follower",
+  "motor_setup_confirmed": false,
+  "port": null,
+  "robot_id": null,
+  "driver_version": null,
+  "calibration_file": null,
+  "camera": {"index": null, "mount": null},
+  "mapping_source": "Names and IDs reported in the screenshot; not yet verified for this follower.",
+  "joints": {
+    "shoulder_pan": {"id": 1, "unit": null, "min": null, "max": null},
+    "shoulder_lift": {"id": 2, "unit": null, "min": null, "max": null},
+    "elbow_flex": {"id": 3, "unit": null, "min": null, "max": null},
+    "wrist_flex": {"id": 4, "unit": null, "min": null, "max": null},
+    "wrist_roll": {"id": 5, "unit": null, "min": null, "max": null},
+    "gripper": {"id": 6, "unit": null, "min": null, "max": null}
+  }
+}

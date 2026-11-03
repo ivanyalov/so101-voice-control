@@ -1,0 +1,3 @@
+# Separate process/environment: PyAV and OpenCV bundle conflicting FFmpeg
+# Objective-C classes on macOS. No model weights are downloaded by installation.
+faster-whisper>=1.1.1

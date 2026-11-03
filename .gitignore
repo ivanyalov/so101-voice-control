@@ -1,0 +1,21 @@
+.venv/
+.venv-stt/
+.venv-robot/
+.venv-calibrate/
+.bootstrap/
+.tools/
+.cache/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.DS_Store
+recordings/
+models/
+vendor/**/.env
+
+
+# Private credential export for manual transfer.
+/out/*_so101.env

@@ -1,0 +1,150 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "0. LIVE voice -> follower ACTIONS (Enter; motors move)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/dev.py",
+      "args": [
+        "voice-toggle",
+        "--terminal",
+        "--robot",
+        "follower",
+        "--execute",
+        "--max-seconds",
+        "90"
+      ],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "1. Check environment (offline)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/dev.py",
+      "args": [
+        "doctor"
+      ],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "2. Parse example plans (offline)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/dev.py",
+      "args": [
+        "offline-smoke"
+      ],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "3. Typed cloud preview (API charges; no robot)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/dev.py",
+      "args": [
+        "preview"
+      ],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "4. USB ports (metadata only)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/dev.py",
+      "args": [
+        "ports"
+      ],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "5. Voice -> Grok -> MOCK targets (Control+Command+Shift+R; API; no robot)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/dev.py",
+      "args": [
+        "voice-toggle",
+        "--mock-state"
+      ],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "6. Legacy Claude agent preview (optional; Anthropic key)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/dev.py",
+      "args": [
+        "agent-preview",
+        "--voice"
+      ],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "7. Voice -> Grok -> MOCK targets (Enter; API; no robot)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/dev.py",
+      "args": [
+        "voice-toggle",
+        "--terminal",
+        "--mock-state"
+      ],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "8. Typed Grok -> MOCK targets (API; no robot)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/dev.py",
+      "args": [
+        "grok-preview",
+        "${input:robotCommand}",
+        "--mock-state"
+      ],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "9. Voice -> Grok -> BOTH measured arms (Enter; no motor writes)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/dev.py",
+      "args": [
+        "voice-toggle",
+        "--terminal",
+        "--robot",
+        "pair",
+        "--max-seconds",
+        "90"
+      ],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "robotCommand",
+      "type": "promptString",
+      "description": "Command for Grok (API request; mock state only)",
+      "default": "Move all the way to the right and then move your elbow up"
+    }
+  ]
+}

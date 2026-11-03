@@ -1,0 +1,41 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "LIVE voice -> follower ACTIONS (motors move)",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "${workspaceFolder}/build/dev.py",
+        "voice-toggle",
+        "--terminal",
+        "--robot",
+        "follower",
+        "--execute",
+        "--max-seconds",
+        "90"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Check environment",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "${workspaceFolder}/build/dev.py",
+        "doctor"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Offline plan examples",
+      "type": "process",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "${workspaceFolder}/build/dev.py",
+        "offline-smoke"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

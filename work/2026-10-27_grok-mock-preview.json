@@ -1,0 +1,74 @@
+{
+  "mode": "dry_run",
+  "planner": "grok",
+  "model": null,
+  "state_source": "mock",
+  "status": "resolved_mock",
+  "reply": "Preview a move to the right endpoint, then raise the elbow.",
+  "proposed_actions": [
+    {
+      "type": "endpoint",
+      "joint": "shoulder_pan",
+      "direction": "right",
+      "amount_degrees": null,
+      "pose": null
+    },
+    {
+      "type": "jog",
+      "joint": "elbow_flex",
+      "direction": "up",
+      "amount_degrees": null,
+      "pose": null
+    }
+  ],
+  "parameter_changes": [
+    {
+      "step": 1,
+      "joint": "shoulder_pan",
+      "joint_id": 1,
+      "before": 15,
+      "target": 70,
+      "delta": 55,
+      "unit": "degrees",
+      "duration_seconds": 1.5
+    },
+    {
+      "step": 2,
+      "joint": "elbow_flex",
+      "joint_id": 3,
+      "before": -20,
+      "target": -10,
+      "delta": 10,
+      "unit": "degrees",
+      "duration_seconds": 1.5
+    }
+  ],
+  "motion_plan": {
+    "say": "Preview a move to the right endpoint, then raise the elbow.",
+    "actions": [
+      {
+        "type": "set_joint",
+        "joint": "1",
+        "angle": 70,
+        "pose": null,
+        "duration": 1.5
+      },
+      {
+        "type": "set_joint",
+        "joint": "3",
+        "angle": -10,
+        "pose": null,
+        "duration": 1.5
+      }
+    ]
+  },
+  "code_preview": [
+    "# MOCK ONLY: robot.joints.set('1', 70, degrees=True)",
+    "# MOCK ONLY: robot.joints.set('3', -10, degrees=True)"
+  ],
+  "unresolved": [],
+  "executed_actions": 0,
+  "validation": "Mock joint limits and Cyberwave plan shape checked; physical geometry, collisions and tracking not validated.",
+  "planner_response_source": "fixture_not_live_grok",
+  "text": "Hey, can you please move all the way to the right and then move your elbow up?"
+}

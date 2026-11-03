@@ -1,0 +1,158 @@
+{
+  "timestamp_utc": "2026-11-03T08:41:54.766626+00:00",
+  "mode": "ping_and_model_read",
+  "motor_register_writes": 0,
+  "executed_actions": 0,
+  "boards": [
+    {
+      "device": "/dev/cu.usbmodem5B910262011",
+      "serial_number": "5B91026201",
+      "vid": 6790,
+      "pid": 21971,
+      "team_role": "follower"
+    }
+  ],
+  "probe": {
+    "board": {
+      "device": "/dev/cu.usbmodem5B910262011",
+      "serial_number": "5B91026201",
+      "vid": 6790,
+      "pid": 21971,
+      "team_role": "follower"
+    },
+    "baudrate": 1000000,
+    "protocol": 0,
+    "motors": [
+      {
+        "id": 1,
+        "model": 777,
+        "communication_result": 0,
+        "device_error": 0,
+        "ok": true,
+        "joint": "shoulder_pan",
+        "registers": {
+          "firmware_major": 3,
+          "firmware_minor": 9,
+          "range_min": 956,
+          "range_max": 3678,
+          "homing_offset": 1929,
+          "operating_mode": 0,
+          "torque_enabled": 1,
+          "present_position": 2225,
+          "voltage_tenths": 121,
+          "temperature_c": 31
+        },
+        "calibration_matches": true
+      },
+      {
+        "id": 2,
+        "model": 777,
+        "communication_result": 0,
+        "device_error": 0,
+        "ok": true,
+        "joint": "shoulder_lift",
+        "registers": {
+          "firmware_major": 3,
+          "firmware_minor": 9,
+          "range_min": 803,
+          "range_max": 3211,
+          "homing_offset": -729,
+          "operating_mode": 0,
+          "torque_enabled": 1,
+          "present_position": 888,
+          "voltage_tenths": 122,
+          "temperature_c": 30
+        },
+        "calibration_matches": true
+      },
+      {
+        "id": 3,
+        "model": 777,
+        "communication_result": 0,
+        "device_error": 0,
+        "ok": true,
+        "joint": "elbow_flex",
+        "registers": {
+          "firmware_major": 3,
+          "firmware_minor": 9,
+          "range_min": 877,
+          "range_max": 3059,
+          "homing_offset": 1123,
+          "operating_mode": 0,
+          "torque_enabled": 1,
+          "present_position": 3061,
+          "voltage_tenths": 122,
+          "temperature_c": 31
+        },
+        "calibration_matches": true
+      },
+      {
+        "id": 4,
+        "model": 777,
+        "communication_result": 0,
+        "device_error": 0,
+        "ok": true,
+        "joint": "wrist_flex",
+        "registers": {
+          "firmware_major": 3,
+          "firmware_minor": 9,
+          "range_min": 865,
+          "range_max": 3258,
+          "homing_offset": 544,
+          "operating_mode": 0,
+          "torque_enabled": 1,
+          "present_position": 1268,
+          "voltage_tenths": 121,
+          "temperature_c": 33
+        },
+        "calibration_matches": true
+      },
+      {
+        "id": 5,
+        "model": 777,
+        "communication_result": 0,
+        "device_error": 0,
+        "ok": true,
+        "joint": "wrist_roll",
+        "registers": {
+          "firmware_major": 3,
+          "firmware_minor": 9,
+          "range_min": 0,
+          "range_max": 4095,
+          "homing_offset": 337,
+          "operating_mode": 0,
+          "torque_enabled": 1,
+          "present_position": 1235,
+          "voltage_tenths": 122,
+          "temperature_c": 34
+        },
+        "calibration_matches": true
+      },
+      {
+        "id": 6,
+        "model": 777,
+        "communication_result": 0,
+        "device_error": 0,
+        "ok": true,
+        "joint": "gripper",
+        "registers": {
+          "firmware_major": 3,
+          "firmware_minor": 9,
+          "range_min": 2036,
+          "range_max": 3549,
+          "homing_offset": 1618,
+          "operating_mode": 0,
+          "torque_enabled": 1,
+          "present_position": 2508,
+          "voltage_tenths": 122,
+          "temperature_c": 34
+        },
+        "calibration_matches": true
+      }
+    ],
+    "all_six_expected_motors": true,
+    "calibration_file": "/Users/ivanyalov/Documents/ChatGPT/so101 setup/inputs/2026-11-03_so101-robot-env/calibration/so101_follower.json",
+    "calibration_verified": true,
+    "motion_readiness_verified": false
+  }
+}

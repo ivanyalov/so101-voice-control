@@ -1,0 +1,13 @@
+{
+  "source": "mock",
+  "notice": "Illustrative degrees, limits, direction signs and positions. NOT calibration for the real arm.",
+  "positions": {"shoulder_pan": 15, "shoulder_lift": 0, "elbow_flex": -20, "wrist_flex": 0, "wrist_roll": 0, "gripper": 0},
+  "joints": {
+    "shoulder_pan": {"id": 1, "min": -70, "max": 70, "jog_step": 10, "duration": 1.5, "direction_sign": {"left": -1, "right": 1}},
+    "shoulder_lift": {"id": 2, "min": -50, "max": 50, "jog_step": 10, "duration": 1.5, "direction_sign": {"up": 1, "down": -1}},
+    "elbow_flex": {"id": 3, "min": -50, "max": 50, "jog_step": 10, "duration": 1.5, "direction_sign": {"up": 1, "down": -1, "forward": 1, "backward": -1}},
+    "wrist_flex": {"id": 4, "min": -50, "max": 50, "jog_step": 10, "duration": 1.5, "direction_sign": {"up": 1, "down": -1}},
+    "wrist_roll": {"id": 5, "min": -50, "max": 50, "jog_step": 10, "duration": 1.5, "direction_sign": {"clockwise": 1, "counterclockwise": -1}},
+    "gripper": {"id": 6, "min": -50, "max": 50, "jog_step": 10, "duration": 1.5, "direction_sign": {"open": 1, "close": -1}}
+  }
+}

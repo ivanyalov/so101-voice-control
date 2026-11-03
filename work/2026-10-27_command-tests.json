@@ -1,0 +1,307 @@
+{
+  "schema_version": 2,
+  "status": "proposed_specification_not_executed",
+  "scope": "multimodal_voice_robot_agent",
+  "language": "en",
+  "fixture_status": "Scene and audio fixtures are described but have not been captured or generated.",
+  "notes": [
+    "These are acceptance specifications, not a runnable test suite.",
+    "Agent scenarios allow natural language and capability discovery; joint parser cases apply only to a narrow helper inside the joint skill.",
+    "Use mock skill/backend implementations before any physical execution.",
+    "Camera failure, target not visible, unavailable skill, task failure and confirmed success are separate outcomes."
+  ],
+  "agent_scenarios": [
+    {
+      "id": "scene_question",
+      "request": "What do you see on the table?",
+      "setup": "Fresh camera image; observation contains labeled objects.",
+      "expected": [
+        "Inspect the fresh image.",
+        "Speak a grounded scene description.",
+        "Issue zero robot movement writes."
+      ]
+    },
+    {
+      "id": "missing_ball",
+      "request": "Pick up the red ball.",
+      "setup": "Fresh unobstructed workspace image; no red ball detected.",
+      "expected": [
+        "Return object_not_visible with observation ID.",
+        "Say that a red ball is not visible in the camera view.",
+        "Issue zero robot movement writes."
+      ]
+    },
+    {
+      "id": "camera_unavailable",
+      "request": "Pick up the red ball.",
+      "setup": "Camera capture fails.",
+      "expected": [
+        "Return perception_unavailable.",
+        "Explain that the scene could not be checked.",
+        "Do not assert that the ball is absent.",
+        "Issue zero robot movement writes."
+      ]
+    },
+    {
+      "id": "ambiguous_target",
+      "request": "Pick up the red ball.",
+      "setup": "Fresh image contains two matching red balls.",
+      "expected": [
+        "Ask which ball the user means.",
+        "Retain candidate identities in conversation state.",
+        "Issue zero robot movement writes until resolved."
+      ]
+    },
+    {
+      "id": "pick_skill_unavailable",
+      "request": "Pick up the red ball.",
+      "setup": "One ball is visible; no validated pick skill is installed.",
+      "expected": [
+        "Return skill_unavailable.",
+        "Explain that picking is not configured yet.",
+        "Do not invent joint targets.",
+        "Issue zero robot movement writes."
+      ]
+    },
+    {
+      "id": "registered_dance",
+      "request": "Dance for us.",
+      "setup": "A taught dance sequence is registered; complete robot profile and fresh joint state exist.",
+      "expected": [
+        "Select the registered dance skill.",
+        "Run it through the selected backend or mock.",
+        "Report the actual task result."
+      ]
+    },
+    {
+      "id": "dance_unavailable",
+      "request": "Dance for us.",
+      "setup": "No dance sequence is registered.",
+      "expected": [
+        "Explain that this skill is not configured.",
+        "Issue zero robot movement writes."
+      ]
+    },
+    {
+      "id": "pick_success_evidence",
+      "request": "Pick up the red ball.",
+      "setup": "A validated pick skill is available; mock task completes and subsequent evidence confirms the ball is lifted.",
+      "expected": [
+        "Invoke the available pick skill for the identified object.",
+        "Check outcome evidence.",
+        "Report success only after confirmation."
+      ]
+    },
+    {
+      "id": "pick_failure_evidence",
+      "request": "Pick up the red ball.",
+      "setup": "Pick routine returns but subsequent observation shows the ball remains on the table.",
+      "expected": [
+        "Return failed or unverified outcome, not success.",
+        "Give an accurate spoken failure response.",
+        "Do not retry indefinitely."
+      ]
+    },
+    {
+      "id": "cancel_during_skill",
+      "request": "Stop.",
+      "setup": "A long-running mock skill is active while voice input remains available.",
+      "expected": [
+        "Dispatch cancellation without waiting for the whole skill.",
+        "Cancel pending trajectory steps.",
+        "Keep software cancellation distinct from physical stop verification."
+      ]
+    },
+    {
+      "id": "stale_object_reference",
+      "request": "Pick it up.",
+      "setup": "Conversation refers to a ball observed earlier; its observation is stale.",
+      "expected": [
+        "Resolve the conversational reference.",
+        "Refresh scene evidence before executing.",
+        "Do not execute from stale object coordinates."
+      ]
+    },
+    {
+      "id": "single_joint_skill",
+      "request": "Move left a little.",
+      "setup": "Joint-jog skill is registered with verified direction profile and fresh state.",
+      "expected": [
+        "Select one bounded shoulder_pan jog using the configured step.",
+        "Keep uninvolved joints at their intended state.",
+        "Report the task result rather than a fabricated completion."
+      ]
+    }
+  ],
+  "joint_skill_parser_cases": [
+    {
+      "id": "left",
+      "input": "move left",
+      "expected": {
+        "type": "jog_joint",
+        "joint": "shoulder_pan",
+        "direction": "left",
+        "steps": 1
+      }
+    },
+    {
+      "id": "right",
+      "input": "move right",
+      "expected": {
+        "type": "jog_joint",
+        "joint": "shoulder_pan",
+        "direction": "right",
+        "steps": 1
+      }
+    },
+    {
+      "id": "up",
+      "input": "move up",
+      "expected": {
+        "type": "jog_joint",
+        "joint": "shoulder_lift",
+        "direction": "up",
+        "steps": 1
+      }
+    },
+    {
+      "id": "down",
+      "input": "move down",
+      "expected": {
+        "type": "jog_joint",
+        "joint": "shoulder_lift",
+        "direction": "down",
+        "steps": 1
+      }
+    },
+    {
+      "id": "short_left",
+      "input": "left",
+      "expected": {
+        "type": "jog_joint",
+        "joint": "shoulder_pan",
+        "direction": "left",
+        "steps": 1
+      }
+    },
+    {
+      "id": "case_and_punctuation",
+      "input": "MOVE RIGHT!",
+      "expected": {
+        "type": "jog_joint",
+        "joint": "shoulder_pan",
+        "direction": "right",
+        "steps": 1
+      }
+    },
+    {
+      "id": "optional_prefix",
+      "input": "Hey robot, move up.",
+      "expected": {
+        "type": "jog_joint",
+        "joint": "shoulder_lift",
+        "direction": "up",
+        "steps": 1
+      }
+    },
+    {
+      "id": "stop",
+      "input": "stop",
+      "expected": {
+        "type": "stop"
+      }
+    },
+    {
+      "id": "negation",
+      "input": "do not move left",
+      "expected": {
+        "type": "reject",
+        "reason": "negated_command"
+      }
+    },
+    {
+      "id": "negated_stop",
+      "input": "do not stop",
+      "expected": {
+        "type": "reject",
+        "reason": "negated_command"
+      }
+    },
+    {
+      "id": "compound",
+      "input": "move left and then move right",
+      "expected": {
+        "type": "reject",
+        "reason": "compound_command"
+      }
+    },
+    {
+      "id": "unsupported_distance",
+      "input": "move left ten times",
+      "expected": {
+        "type": "reject",
+        "reason": "unsupported_modifier"
+      }
+    },
+    {
+      "id": "unknown",
+      "input": "what time is it",
+      "expected": {
+        "type": "reject",
+        "reason": "unknown_command"
+      }
+    },
+    {
+      "id": "empty",
+      "input": "",
+      "expected": {
+        "type": "reject",
+        "reason": "empty_input"
+      }
+    }
+  ],
+  "execution_contract_cases": [
+    {
+      "id": "relative_target",
+      "setup": "Mock degree profile: pan=10, left_sign=+1, step=5; complete fresh state and valid limits.",
+      "command": "move left",
+      "expected": "Target pan=15; all other joints retain their observed targets; interpolate per configured limits."
+    },
+    {
+      "id": "missing_profile",
+      "setup": "Physical mode with direction signs or limits missing.",
+      "command": "move left",
+      "expected": "Reject execution; zero movement writes."
+    },
+    {
+      "id": "stale_state",
+      "setup": "Observation older than configured state timeout.",
+      "command": "move up",
+      "expected": "Reject execution; zero movement writes."
+    },
+    {
+      "id": "joint_limit",
+      "setup": "Requested target would cross configured joint limit.",
+      "command": "move right",
+      "expected": "Reject execution with limit reason; zero movement writes."
+    },
+    {
+      "id": "mock_isolation",
+      "setup": "Mock mode selected.",
+      "command": "move down",
+      "expected": "Return preview/log; never open a physical USB port."
+    },
+    {
+      "id": "cancel_sequence",
+      "setup": "Executor running a multi-step mock trajectory.",
+      "command": "stop",
+      "expected": "Cancel remaining trajectory and queued motion; record cancellation; no further trajectory writes after cancellation is processed. Physical hold behavior is a separate integration test."
+    },
+    {
+      "id": "invalid_action",
+      "setup": "Skill returns NaN, infinity or an unknown joint key.",
+      "command": "internal action validation",
+      "expected": "Reject action before driver write."
+    }
+  ]
+}

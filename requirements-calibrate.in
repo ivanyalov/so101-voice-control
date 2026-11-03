@@ -1,0 +1,2 @@
+# Official calibration environment; separate from voice and direct-control environments.
+lerobot[feetech]==0.4.4
