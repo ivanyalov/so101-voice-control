@@ -1,0 +1,89 @@
+--- a/so101/follower.py
++++ b/so101/follower.py
+@@ -1,6 +1,8 @@
+ """SO101 Follower class for teleoperation."""
+ 
+ import logging
++import os
++from so101.session_hold import connect_preserving_pose, disconnect_preserving_pose
+ import time
+ from pathlib import Path
+ from typing import Callable, Dict, List, Optional, Tuple, Union
+@@ -232,6 +234,9 @@
+         if not self.connected:
+             return
+ 
++        if os.getenv("CYBERWAVE_PRESERVE_POSE") == "1":
++            return disconnect_preserving_pose(self)
++
+         if not skip_sit_down and self._torque_enabled and self.bus is not None:
+             logger.info("Moving to sit down position before disconnect...")
+             try:
+@@ -273,6 +278,11 @@
+         if self.connected:
+             logger.warning("Follower is already connected")
+             return
++
++        if os.getenv("CYBERWAVE_PRESERVE_POSE") == "1":
++            if calibrate:
++                raise RuntimeError("Automatic recalibration disabled in preserve-pose mode")
++            return connect_preserving_pose(self)
+ 
+         self.bus.connect()
+         self._connected = True
+--- a/scripts/cw_remoteoperate.py
++++ b/scripts/cw_remoteoperate.py
+@@ -1,6 +1,7 @@
+ """Remote operation loop for SO101 follower via Cyberwave MQTT."""
+ 
+ import logging
++import os
+ import queue
+ import sys
+ import threading
+@@ -244,25 +245,26 @@
+         if follower.calibration is not None:
+             upload_calibration_to_twin(follower, robot, "follower")
+ 
+-        # Move follower to zero pose after connecting (bypass collision checks)
+-        logger.info("Moving follower to zero pose...")
+-        zero_pose_action = {
+-            "shoulder_pan.pos": 0.0,
+-            "shoulder_lift.pos": 0.0,
+-            "elbow_flex.pos": 0.0,
+-            "wrist_flex.pos": 0.0,
+-            "wrist_roll.pos": 0.0,
+-            "gripper.pos": GRIPPER_HOME_OPEN_NORM,
+-        }
+-        success, msg = follower.send_action_safe(
+-            zero_pose_action,
+-            check_collision=False,
+-            check_load_before=False,
+-        )
+-        if success:
+-            logger.info("Follower moved to zero pose successfully")
+-        else:
+-            logger.warning(f"Failed to move follower to zero pose: {msg}")
++        if os.getenv("CYBERWAVE_PRESERVE_POSE") != "1":
++            # Move follower to zero pose after connecting (bypass collision checks)
++            logger.info("Moving follower to zero pose...")
++            zero_pose_action = {
++                "shoulder_pan.pos": 0.0,
++                "shoulder_lift.pos": 0.0,
++                "elbow_flex.pos": 0.0,
++                "wrist_flex.pos": 0.0,
++                "wrist_roll.pos": 0.0,
++                "gripper.pos": GRIPPER_HOME_OPEN_NORM,
++            }
++            success, msg = follower.send_action_safe(
++                zero_pose_action,
++                check_collision=False,
++                check_load_before=False,
++            )
++            if success:
++                logger.info("Follower moved to zero pose successfully")
++            else:
++                logger.warning(f"Failed to move follower to zero pose: {msg}")
+ 
+         # Initialize Pinocchio for kinematics safety checks (load URDF once)
+         # floor_z=0.0 means the floor is at the base level (Z=0)

@@ -122,6 +122,30 @@ class GrokPlannerTests(unittest.TestCase):
 
 
 class IntentOutputTests(unittest.TestCase):
+    def test_live_follower_schema_cannot_select_both_arms(self):
+        requests = []
+        data = intent([{**action('relative', 'shoulder_pan', 'right', 15), 'arm': 'follower'}])
+        def handle(request):
+            requests.append(json.loads(request.content))
+            return httpx.Response(200, json=response(data))
+        with patch.dict(os.environ, ENV), patch.object(grok_planner.httpx, 'Client', side_effect=lambda **kw: Client(transport=httpx.MockTransport(handle), **kw)):
+            result = grok_planner.interpret('Base 15 to the right.', follower_only=True)
+        self.assertEqual(result['actions'][0]['arm'], 'follower')
+        self.assertEqual(requests[0]['response_format']['json_schema']['schema']['properties']['actions']['items']['properties']['arm']['enum'], ['follower'])
+        self.assertNotIn('TWO SO101 arms', requests[0]['messages'][0]['content'])
+
+    def test_live_explicit_unavailable_arm_is_not_redirected(self):
+        with patch.dict(os.environ, ENV), patch.object(grok_planner.httpx, 'Client') as client:
+            for text in ('leader base left 5', 'both arms left 10', 'two arms right 15'):
+                self.assertEqual(grok_planner.interpret(text, follower_only=True)['status'], 'unsupported')
+        client.assert_not_called()
+
+    def test_live_noncompliant_both_response_is_rejected(self):
+        data = intent([{**action('relative', 'shoulder_pan', 'right', 15), 'arm': 'both'}])
+        with patch.dict(os.environ, ENV), patch.object(grok_planner.httpx, 'Client', side_effect=lambda **kw: Client(transport=httpx.MockTransport(lambda req: httpx.Response(200, json=response(data))), **kw)):
+            with self.assertRaisesRegex(ValueError, 'Invalid arm target'):
+                grok_planner.interpret('Base 15 to the right.', follower_only=True)
+
     def test_http_schema_preserves_order_without_inventing_motor_targets(self):
         requests = []
         def handle(request):

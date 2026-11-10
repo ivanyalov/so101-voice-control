@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+import wave
 
 ROOT = Path(__file__).resolve().parents[1]
 def _run(args: list[str], timeout: int = 120) -> None:
@@ -44,23 +45,41 @@ def resolve_model(model: Path | None = None) -> Path:
 
 
 def transcribe(audio: Path, model: Path | None = None) -> dict:
-    executable, ffmpeg = shutil.which("whisper-cli"), shutil.which("ffmpeg")
-    if not executable or not ffmpeg:
-        raise RuntimeError("whisper-cli and ffmpeg are required for this local STT adapter.")
+    executable = shutil.which("whisper-cli")
+    if not executable:
+        raise RuntimeError("whisper-cli is required for this local STT adapter.")
     if not audio.is_file():
         raise RuntimeError(f"Audio file not found: {audio}")
     model_path = resolve_model(model)
     start = time.perf_counter()
     with tempfile.TemporaryDirectory(prefix="so101-stt-") as directory:
-        wav = Path(directory) / "input.wav"
+        wav = audio
         prefix = Path(directory) / "transcript"
-        _run([ffmpeg, "-nostdin", "-v", "error", "-i", str(audio), "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(wav)])
-        _run([executable, "-m", str(model_path), "-f", str(wav), "-l", "en", "-otxt", "-of", str(prefix), "-np", "-nt"])
+        converted = not whisper_ready_wav(audio)
+        if converted:
+            ffmpeg = shutil.which("ffmpeg")
+            if not ffmpeg:
+                raise RuntimeError("ffmpeg is required to convert this audio format.")
+            wav = Path(directory) / "input.wav"
+            _run([ffmpeg, "-nostdin", "-v", "error", "-i", str(audio), "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(wav)])
+        _run([executable, "-m", str(model_path), "-f", str(wav), "-l", "en", "-otxt", "-of", str(prefix), "-np", "-nt", "--no-gpu"])
         transcript_path = prefix.with_suffix(".txt")
         if not transcript_path.is_file():
             raise RuntimeError("Whisper did not produce a transcript file")
         text = transcript_path.read_text().strip()
-    return {"text": text, "elapsed_seconds": round(time.perf_counter() - start, 3), "backend": "local whisper.cpp"}
+    return {"text": text, "elapsed_seconds": round(time.perf_counter() - start, 3),
+            "backend": "local whisper.cpp", "inference_device": "cpu", "audio_converted": converted}
+
+
+def whisper_ready_wav(audio: Path) -> bool:
+    """Inspect format, without resampling or changing the source recording."""
+    try:
+        with wave.open(str(audio), 'rb') as source:
+            return (source.getnchannels() == 1 and source.getframerate() == 16000
+                    and source.getsampwidth() == 2 and source.getcomptype() == 'NONE'
+                    and source.getnframes() > 0)
+    except (wave.Error, EOFError):
+        return False
 
 
 def record(seconds: float = 4) -> Path:

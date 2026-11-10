@@ -1,0 +1,3 @@
+# Optional terminal transport, installed into the existing project .venv.
+# The paired driver and Cyberwave CLI have their own environments.
+cyberwave==0.7.4

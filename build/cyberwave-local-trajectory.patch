@@ -1,0 +1,50 @@
+--- a/utils/cw_remoteoperate_helpers.py
++++ b/utils/cw_remoteoperate_helpers.py
+@@ -1,6 +1,7 @@
+ """Helper functions for cw_remoteoperate and cw_teleoperate scripts."""
+ 
+ import argparse
++from utils.cw_local_trajectory import schedule_chunks, wait_for_chunk
+ import logging
+ import os
+ import queue
+@@ -385,6 +386,21 @@
+                 continue
+ 
+             delta_meta = action.pop(DELTA_META_KEY, None)
++            try:
++                chunk_ready = wait_for_chunk(delta_meta, stop_event)
++            except RuntimeError:
++                logger.exception("Local trajectory aborted")
++                stop_event.set()
++                chunk_ready = False
++            if not chunk_ready:
++                action_queue.task_done()
++                while True:
++                    try:
++                        action_queue.get_nowait()
++                        action_queue.task_done()
++                    except queue.Empty:
++                        break
++                continue
+ 
+             try:
+                 # Validate with Pinocchio (CPU only, no serial I/O) if initialized
+@@ -769,6 +785,7 @@
+         if abs(total_delta) > 1e-9:
+             expected_final_rad[joint_name] = base_rad[joint_name] + total_delta
+ 
++    local_schedule = schedule_chunks(data, len(chunks))
+     for chunk_idx, chunk in enumerate(chunks):
+         deltas = chunk.get("positions") or chunk.get("deltas")
+         if not deltas or not isinstance(deltas, dict):
+@@ -825,7 +842,8 @@
+             if status_tracker:
+                 status_tracker.update_joint_states(joint_states_for_status)
+             delta_meta: Dict[str, Any] = {
+-                "inter_chunk_delay_sec": 0.1,
++                "inter_chunk_delay_sec": 0 if data.get("local_trajectory_hz") else 0.1,
++                **local_schedule[chunk_idx],
+             }
+             is_last_chunk = chunk_idx == len(chunks) - 1
+             if is_last_chunk and expected_final_rad:

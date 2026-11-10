@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SO101 control</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header><h1>SO101 control</h1><span id="connection" role="status">Connecting to local interface…</span><button id="stop" class="danger">Stop</button></header>
+<div class="toolbar"><button data-command="start">Start control</button><button data-command="read">Read joints</button><button data-command="status">Check connection</button><button data-command="free">Freedrive</button><span>Support the arm before Freedrive. Stop retains holding torque.</span></div>
+<main>
+<aside><h2>Joints</h2><p class="muted">Select a joint for numeric commands.</p><div id="joints"></div>
+<label for="degrees">Amount, degrees</label><input id="degrees" type="number" min="0.1" step="1" value="5">
+<div class="jog"><button id="minus">Jog −</button><button id="plus">Jog +</button></div>
+<div class="jog"><button data-taught="right">Right</button><button data-taught="middle">Middle</button><button data-taught="left">Left</button></div>
+<p class="muted">Right / Middle / Left use the taught base positions. +/− use joint coordinates.</p><p class="muted">Joint readings appear after Read joints. They are snapshots, not live telemetry.</p></aside>
+<section class="console"><div class="console-heading"><h2>Commands</h2><label class="mode"><input id="preview" type="checkbox" checked> Preview movement</label></div>
+<div class="notice">Saved-pose replay is unavailable while smooth motion is being validated.</div>
+<div id="log" role="log" aria-label="Command history" aria-live="polite"></div>
+<div id="error" role="alert"></div>
+<form id="command-form"><label for="command">Command or phrase</label><div class="compose"><input id="command" autocomplete="off" placeholder="jog wrist_roll 5, or wrist roll plus five degrees"><button id="send" type="submit">Send</button></div></form>
+<div class="voice"><button id="record">Record voice</button><span id="voice-state">Microphone off · maximum 30 seconds</span></div>
+<p class="footnote">Voice: local Whisper → existing Grok interpreter. Phrases send transcripts to xAI. Preview interprets without movement. Start, Stop, Freedrive and reads act immediately.</p>
+</section></main><script src="/app.js"></script></body></html>

@@ -63,6 +63,7 @@ def main():
     toggle.add_argument('--max-seconds', type=float, default=30)
     toggle.add_argument('--planner', choices=('grok', 'basic'), default='grok')
     toggle.add_argument('--paired', action='store_true', help='Include arm names in semantic output')
+    toggle.add_argument('--execute', action='store_true', help='Execute explicit-degree follower commands through Cyberwave')
     toggle.add_argument('--default-arm', choices=('leader', 'follower', 'both'), default='both')
     grok = sub.add_parser('grok-preview', help='Interpret typed text with Grok (API call)')
     grok.add_argument('text')
@@ -88,7 +89,7 @@ def main():
             return doctor()
         if args.command == 'voice-toggle':
             import voice_toggle
-            return voice_toggle.run(terminal=args.terminal, max_seconds=args.max_seconds, planner=args.planner, paired=args.paired, default_arm=args.default_arm)
+            return voice_toggle.run(terminal=args.terminal, max_seconds=args.max_seconds, planner=args.planner, paired=args.paired, default_arm=args.default_arm, execute=args.execute)
         if args.command == 'grok-preview':
             import grok_planner
             result = grok_planner.preview(args.text, paired=args.paired, default_arm=args.default_arm)

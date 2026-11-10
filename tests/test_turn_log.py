@@ -38,7 +38,8 @@ class TurnLogTests(unittest.TestCase):
         result = records[-1]["result"]
         self.assertEqual(result["text"], "move elbow up")
         self.assertEqual(result["parameter_changes"], plan["parameter_changes"])
-        self.assertIn("planning_elapsed_seconds", result)
+        self.assertIn("command_processing_elapsed_seconds", result)
+        self.assertNotIn("planning_elapsed_seconds", result)
         self.assertEqual(result["executed_actions"], 0)
         self.assertTrue(all(r["timestamp"].endswith("+00:00") for r in records))
 

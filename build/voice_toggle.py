@@ -178,7 +178,7 @@ class Session:
             self.event("recording_stopped", audio_file=str(audio))
             self.busy = True
             print("Microphone OFF. Transcribing locally...", flush=True)
-            self.worker = threading.Thread(target=self._transcribe, args=(audio,), daemon=True)
+            self.worker = threading.Thread(target=self._transcribe, args=(audio,))
             self.worker.start()
         except Exception as exc:
             self.recorder.cancel()
@@ -191,14 +191,17 @@ class Session:
         try:
             started = time.perf_counter()
             result = readiness.transcribe(audio)
+            transcribed = time.perf_counter()
+            result['transcription_elapsed_seconds'] = round(transcribed-started, 3)
             print("TRANSCRIPT: " + result["text"], flush=True)
             self.event("transcript", audio_file=str(audio), result=result)
             self.event("planner_started")
-            planner_started = time.perf_counter()
             plan = self.processor(result["text"])
+            finished = time.perf_counter()
             result = {**result, **plan,
-                      "planning_elapsed_seconds": round(time.perf_counter() - planner_started, 3),
-                      "processing_elapsed_seconds": round(time.perf_counter() - started, 3),
+                      "transcription_elapsed_seconds": round(transcribed - started, 3),
+                      "command_processing_elapsed_seconds": round(finished - transcribed, 3),
+                      "processing_elapsed_seconds": round(finished - started, 3),
                       "audio_file": str(audio)}
             self.event("result", result=result)
             self.results.put((result, None))
@@ -227,7 +230,10 @@ class Session:
 
 
 def run(*, terminal: bool = False, max_seconds: float = 30, planner: str = "grok",
-        paired: bool = False, default_arm: str = "both") -> int:
+        paired: bool = False, default_arm: str = "both", execute: bool = False) -> int:
+    cancelled = threading.Event()
+    if execute and (planner != 'grok' or paired):
+        raise ValueError('Live voice uses Grok and the paired follower only.')
     if planner == "grok":
         import grok_planner
         try:
@@ -237,14 +243,16 @@ def run(*, terminal: bool = False, max_seconds: float = 30, planner: str = "grok
             return 1
         def processor(text):
             print("TRANSCRIBED. Interpreting with Grok...", flush=True)
-            return grok_planner.preview(text, paired=paired, default_arm=default_arm)
+            import voice_control
+            return voice_control.process_text(text, preview=not execute, cancelled=cancelled)
     else:
         processor = command_preview.preview
     readiness.resolve_model()
     stamp = datetime.now(ZoneInfo("Asia/Hong_Kong")).strftime("%Y-%m-%d_%H-%M-%S")
     log = TurnLog(readiness.ROOT / ".cache/logs" / f"{stamp}_voice-{time.time_ns()}.jsonl")
     log.write("session_started", planner=planner, model=model if planner == "grok" else None,
-              state_source="unavailable", paired=paired, default_arm=default_arm, max_seconds=max_seconds,
+              state_source="cyberwave_edge_follower" if execute else "unavailable", execute=execute,
+              paired=paired, default_arm='follower' if execute else default_arm, max_seconds=max_seconds,
               source_file=str(Path(__file__).resolve()))
     recorder = Recorder(max_seconds)
     session = Session(recorder, processor=processor, log=log)
@@ -285,7 +293,8 @@ def run(*, terminal: bool = False, max_seconds: float = 30, planner: str = "grok
         print("Enter: start/stop recording in this terminal. Type quit or press Ctrl+C to exit.", flush=True)
         if planner == "grok":
             print(f"Local Whisper -> Grok ({model}) -> structured command JSON. API requests may incur charges.", flush=True)
-            print("Intent output only. No motor controller is connected.", flush=True)
+            print("LIVE: verified directions execute through Cyberwave. Use ./robot stop in another terminal to stop the driver." if execute else
+                  "Preview: exact prepared commands. No robot connection.", flush=True)
         else:
             print("Local Whisper + basic phrase helper. No LLM/API or robot.", flush=True)
         print(f"Auto-stop recording after {max_seconds:g}s.", flush=True)
@@ -312,11 +321,15 @@ def run(*, terminal: bool = False, max_seconds: float = 30, planner: str = "grok
     except KeyboardInterrupt:
         pass
     finally:
+        cancelled.set()
         if recorder.recording:
             session.event("recording_discarded")
         recorder.cancel()
         if listener is not None:
             listener.stop()
+        if session.worker is not None and session.worker.is_alive():
+            print('Cancelling the active command; waiting for stop/hold cleanup…', flush=True)
+            session.worker.join(timeout=5)
         log.write("session_stopped")
-        print("Stopped. Microphone off.", flush=True)
+        print("Stopped. Microphone off. Active command cancellation requested." if execute else "Stopped. Microphone off.", flush=True)
     return 0

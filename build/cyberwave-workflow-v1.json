@@ -1,0 +1,11 @@
+{
+  "protocol": "so101.workflow.v1",
+  "base_image": "cyberwaveos/so101-driver@sha256:90e54614d43e74e9648a020ec59198632453da1454c92019a3108a45acd01450",
+  "input_stage": "after preserve-pose and local-trajectory patches",
+  "sha256": {
+    "main.py": "e3f0cb0aadf159ff2aa80dde3c7616725ee28c64df2089523ac90201defd1f3a",
+    "scripts/cw_remoteoperate.py": "b46303ed525bd604fd00225b668c68c775ef1ee29b57cbc32299fc1bbb39ea4d",
+    "so101/follower.py": "f889727fd0b3a4bc323a4ad5612f4715041ed6ea6d443be54b3cb1e63efb477d",
+    "utils/cw_remoteoperate_helpers.py": "e2c1fc2b628085482b4a8ea68fd08b587986aa568515b7d820912c3cda841616"
+  }
+}

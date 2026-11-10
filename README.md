@@ -1,90 +1,80 @@
-# SO101 voice system
+# SO101 voice control
 
-Local microphone capture → Whisper transcription → Grok structured command JSON. The repository contains the voice and interpretation layer, with optional local speech output and a standalone camera check.
+Speak an English command in the terminal. Local Whisper transcribes it, Grok turns the transcript into structured intent, and the local client resolves the exact targets. In execution mode, Cyberwave sends the targets to a paired SO101 follower. Grok receives the transcript. Audio is processed on the Mac.
 
-## Setup on macOS
+## Set up the client on macOS
 
-Use Python 3.12. Install `whisper-cpp` and `ffmpeg` through Homebrew, then create the Python environment:
+Install Homebrew and Git, then run these commands from a terminal. The private repository requires GitHub access.
 
 ```sh
+git clone https://github.com/ivanyalov/so101-voice-control.git
+cd so101-voice-control
+brew install python@3.12 whisper-cpp portaudio libsndfile ffmpeg
 python3.12 -m venv .venv
 .venv/bin/python -m pip install -r requirements.lock
-cp .env.example .env
 ```
 
-Set `XAI_API_KEY` and `XAI_MODEL` in `.env`, or copy the separately supplied credential file into place. The credential file is excluded from Git. `requirements.lock` pins the macOS environment; `requirements.in` lists direct dependencies. The optional `requirements-stt.in` / `.lock` describe the alternative faster-whisper environment; the active launcher uses whisper.cpp.
+Save the privately supplied environment file as `.env` in the project root and run `chmod 600 .env`. If using your own accounts, copy [`.env.example`](.env.example) to `.env` and fill in your xAI settings. For Cyberwave control, also set the key, workspace ID and paired twin UUID. Existing Cyberwave Edge installations can supply the key and workspace from their local configuration instead.
 
-Download the model to the path in `.env`. The pinned URL, size and SHA-256 are in `config/whisper-model.json`:
+Download the pinned English Whisper model and verify its checksum:
 
 ```sh
-.venv/bin/python - <<'PYTHON'
-import hashlib, json, pathlib, urllib.request
-config = json.loads(pathlib.Path('config/whisper-model.json').read_text())
-output = pathlib.Path(config['path'])
+.venv/bin/python - <<'PY'
+import hashlib
+import json
+from pathlib import Path
+from urllib.request import urlretrieve
+
+model = json.loads(Path("config/whisper-model.json").read_text())
+output = Path(model["path"])
 output.parent.mkdir(parents=True, exist_ok=True)
 if not output.exists():
-    urllib.request.urlretrieve(config['url'], output)
-assert output.stat().st_size == config['size_bytes']
-assert hashlib.sha256(output.read_bytes()).hexdigest() == config['sha256']
-print('Whisper model verified')
-PYTHON
+    urlretrieve(model["url"], output)
+if output.stat().st_size != model["size_bytes"] or hashlib.sha256(output.read_bytes()).hexdigest() != model["sha256"]:
+    raise SystemExit(f"Model verification failed. Remove {output} and download it again.")
+print("Whisper model verified")
+PY
 .venv/bin/python build/dev.py doctor
 ```
 
-## Voice input
+## Try it without a robot
 
 ```sh
-.venv/bin/python build/dev.py voice-toggle --terminal --max-seconds 90
+.venv/bin/python build/dev.py voice-toggle --terminal
+./robot say "move the elbow plus 10 degrees while moving the wrist roll minus 5 degrees" --preview
 ```
 
-Press Enter to start recording, speak, then press Enter to stop. The microphone closes before transcription and the Grok request. The terminal prints the transcript and validated JSON, then returns to `READY`. Type `quit` or press Ctrl+C to exit.
+In the voice terminal, press Enter to record and Enter again to transcribe and interpret. Type `quit` to exit. Allow Terminal to use the microphone when macOS prompts. The first command prints the transcript and Grok intent. The second also shows the locally resolved targets without connecting to Cyberwave. Both Grok paths need an xAI key and internet access. `./control --demo` opens an optional local browser demo without using the microphone, Grok or Cyberwave.
 
-Without `--terminal`, Control + Command + Shift + R also toggles recording. Missing macOS keyboard permission falls back to Enter. Microphone permission is required for capture. Each recording is capped at 30 seconds by default, configurable from 1 to 120 seconds.
-
-For leader/follower/both labels in the output:
+## Use an existing paired robot
 
 ```sh
-.venv/bin/python build/dev.py voice-toggle --terminal --paired
-.venv/bin/python build/dev.py grok-preview "Move both arms 5 degrees left then 30 degrees right" --paired
+.venv/bin/python -m pip install -r requirements-cyberwave.in
+./robot status
 ```
 
-`--default-arm leader|follower|both` sets the label for commands that omit an arm when `--paired` is enabled. These are semantic labels, with no USB connection or motor configuration.
+The client can run on a different Mac from the robot host. The credentials must authorize the intended workspace and twin. The host needs the matching patched Cyberwave driver and fresh six-joint feedback. A generic Cyberwave installation does not have the managed motion protocol. Check the twin with the operator and use one command-producing session at a time.
 
-## Output contract
+The live voice entry point is `./robot voice`. Opening it leaves the microphone off and sends no movement. Enter starts recording and Enter again submits the phrase for execution. `./robot say "…"` runs the same workflow for typed commands. Use the preview above to inspect targets first. The operator should be at the robot for the initial connected checks and subsequent motion tests. `./robot stop` requests a driver stop with holding torque. It is not an emergency power cut.
 
-`grok_planner.interpret(text, paired=False)` returns `status`, `reply` and ordered `actions`. Each action includes `type`, `joint`, `direction`, `amount_degrees` and `pose`; paired mode adds `arm`. Types are `relative`, `jog`, `endpoint`, `pose` and `stop`.
+The repository includes the native Mac host code and driver patches. Starting a host from a fresh clone requires separate provisioning: the reviewed Cyberwave SO101 source snapshot and native Python environment, pairing and workspace configuration, the follower's own calibration and URDF, and its USB device path. These are local to the robot host. The existing configured host can use `./robot native status` for local feedback health.
 
-An explicit degree amount is retained from the request. Jog and endpoint requests keep their amount null. A named pose remains a name without a stored joint position. Ambiguous or unsupported requests return an explanation with no actions. Replies describe the proposed command rather than claiming execution.
+## What works and what is still open
 
-`grok_planner.preview(...)` wraps the intent as `mode=intent_only`, `proposed_actions`, and `executed_actions=0`. It leaves `motion_plan=null` and `parameter_changes=[]`. A downstream controller must supply its own state, physical viewpoint, limits, calibration and execution policy.
+| Feature | Status |
+| --- | --- |
+| Local English speech recognition and Grok interpretation | Voice capture and interpretation are available without a robot. The normal recording format goes directly to whisper.cpp in CPU mode. Recognition accuracy across speakers and six-joint commands is unbenchmarked. |
+| Exact targets from voice or typed text | The local converter supports explicit signed arm angles and gripper opening percentages. Taught base labels such as “all the way left” and “halfway right” require the matching twin's local direction profile. Physical direction words for the other joints need verified mappings. |
+| Coordinated motion | “While” or “together” puts up to six joints in one segment, and “then” starts another. The patched driver schedules continuous 30 Hz motion locally and checks completion using fresh feedback. Verified in offline tests. Physical timing, accuracy, stop behavior and stationary six-servo feedback still need acceptance on the connected arm. |
+| Native Cyberwave transport | The configured Mac host has started and answered read-only requests through MQTT with the arm disconnected. Sustained MQTT and USB feedback reliability are still open. |
+| Saved poses | Coordinates can be inspected with `./robot pose NAME --preview`. Powered replay is disabled pending travel-path validation. |
 
-## Other commands
+The taught direction profile and supported folded pose are specific to each robot. Keep `.cache/robot/directions.json` and `.cache/robot/poses.json` local and use verified data for the intended twin. These files are not created by cloning the repository. The folded pose is used to decide when the patched driver may release torque after successful motion. Otherwise it retains holding torque.
+
+## Offline checks
 
 ```sh
-# Typed Grok interpretation, using the configured API account:
-.venv/bin/python build/dev.py grok-preview "Bend the wrist down 30 degrees"
-# Offline basic phrase helper:
-.venv/bin/python build/dev.py command-preview "move left then move up"
-.venv/bin/python build/dev.py voice-toggle --terminal --planner basic
-# Local audio transcription and optional speech output:
-.venv/bin/python build/dev.py transcribe recording.wav
-.venv/bin/python build/dev.py listen --seconds 4
-.venv/bin/python build/dev.py speak "Ready"
-# Synthetic speech test, without microphone or speaker playback:
-.venv/bin/python build/dev.py speech-smoke
-# Standalone local camera snapshot:
-.venv/bin/python build/dev.py camera-check --index 0
+.venv/bin/python -m unittest discover -s tests
 ```
 
-Audio and JSONL session logs are stored locally under ignored `.cache/audio/` and `.cache/logs/`. Logs include transcripts, intent results, errors and timings. Grok calls send the transcript and fixed schema/instructions to xAI. The normal voice loop does not speak replies; `speak` and `listen --speak` opt into local macOS speech output. Camera snapshots are a separate check and are not sent to Grok by this launcher.
-
-## Verification
-
-```sh
-.venv/bin/python -m unittest discover -s tests -v
-.venv/bin/python build/dev.py doctor
-```
-
-Tests cover recording lifecycle, shortcuts, structured intent validation, mocked HTTP responses, command ordering, error handling and session logging. They do not establish microphone quality, live model quality or physical robot behavior.
-
-`build/` contains the voice implementation, `tests/` its offline checks, `config/` the Whisper model provenance, and `.vscode/` voice-only launch configurations. Hardware settings, calibration, motion presets, servo tools, mock motor states and hardware reports are excluded from the current repository tree. Previous local material is preserved in ignored `_old/`.
+A fresh clone skips the tests that require the reviewed upstream driver source snapshot. See [third-party sources](THIRD_PARTY.md) for patch provenance and the [browser interface guide](docs/2026-11-04_control-interface.md) for its controls.

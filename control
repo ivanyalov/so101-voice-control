@@ -1,0 +1,3 @@
+#!/bin/sh
+ROBOT_UI_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec "$ROBOT_UI_ROOT/.venv/bin/python" "$ROBOT_UI_ROOT/build/control_ui.py" "$@"
