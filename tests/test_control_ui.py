@@ -1,5 +1,6 @@
 """UI command boundary and interruption tests; no network, audio or hardware."""
 import io
+import os
 from pathlib import Path
 import signal
 import sys
@@ -27,7 +28,12 @@ class ControlTests(unittest.TestCase):
         with patch.object(ui.subprocess, 'Popen') as popen:
             console.launch(['python', 'worker', 'quoted text; $(no)'])
         self.assertEqual(popen.call_args.args[0][-1], 'quoted text; $(no)')
-        self.assertTrue(popen.call_args.kwargs['start_new_session'])
+        if os.name == 'nt':
+            self.assertEqual(popen.call_args.kwargs['creationflags'],
+                             ui.subprocess.CREATE_NEW_PROCESS_GROUP)
+            self.assertFalse(popen.call_args.kwargs['start_new_session'])
+        else:
+            self.assertTrue(popen.call_args.kwargs['start_new_session'])
         self.assertNotIn('shell', popen.call_args.kwargs)
 
     def test_demo_never_launches_process_or_microphone(self):
@@ -50,9 +56,15 @@ class ControlTests(unittest.TestCase):
         console = ui.Console(demo=True)
         process = Mock(pid=1234)
         console.process = process
-        with patch.object(ui.os, 'killpg') as kill:
-            console.stop()
-        kill.assert_called_once_with(1234, signal.SIGKILL)
+        if os.name == 'nt':
+            with patch.object(ui.subprocess, 'run') as run:
+                console.stop()
+            run.assert_called_once_with(['taskkill', '/F', '/T', '/PID', '1234'],
+                                        capture_output=True)
+        else:
+            with patch.object(ui.os, 'killpg') as kill:
+                console.stop()
+            kill.assert_called_once_with(1234, signal.SIGKILL)
         process.wait.assert_called_once()
         self.assertIsNone(console.process)
 

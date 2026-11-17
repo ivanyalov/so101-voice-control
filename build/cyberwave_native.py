@@ -109,7 +109,7 @@ def prepare(port=None):
         env = json.loads((config/'environment.json').read_text())
         manifest = dict(port=port, twin=setup['twin_uuid'], workspace=env['workspace_uuid'],
                         protocol='so101.workflow.v1', source_origin='reviewed local Cyberwave 0.3.0 snapshot',
-                        sha256={str(p.relative_to(tmp)):digest(p) for p in tmp.rglob('*') if p.is_file()})
+                        sha256={p.relative_to(tmp).as_posix():digest(p) for p in tmp.rglob('*') if p.is_file()})
         for p in source.rglob('*.py'):
             compile(p.read_text(), str(p), 'exec')
         shutil.move(str(source), SOURCE)
@@ -125,7 +125,7 @@ def verify():
         if digest(STATE/name) != expected:
             raise RuntimeError('Native bundle/configuration changed: '+name)
     expected = {n for n in manifest['sha256'] if n.startswith('source/') and n.endswith('.py')}
-    actual = {str(p.relative_to(STATE)) for p in SOURCE.rglob('*.py')}
+    actual = {p.relative_to(STATE).as_posix() for p in SOURCE.rglob('*.py')}
     if actual != expected:
         raise RuntimeError('Native source inventory differs from reviewed bundle.')
     return manifest

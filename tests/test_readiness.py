@@ -34,7 +34,7 @@ class TranscriptionFormatTests(unittest.TestCase):
     def test_ready_recording_passes_original_bytes_directly_to_whisper(self):
         source = self.wav()
         before = source.read_bytes()
-        with patch.object(readiness.shutil, 'which', side_effect=lambda name: 'whisper-cli' if name=='whisper-cli' else None) as which, \
+        with patch.object(readiness, 'which', side_effect=lambda name: 'whisper-cli' if name=='whisper-cli' else None) as which, \
              patch.object(readiness, '_run', side_effect=self.run_tool) as run:
             result = readiness.transcribe(source, self.model)
         self.assertFalse(result['audio_converted'])
@@ -50,7 +50,7 @@ class TranscriptionFormatTests(unittest.TestCase):
         for options in ({'rate':48000}, {'channels':2}, {'width':3}):
             with self.subTest(options=options):
                 source=self.wav(**options)
-                with patch.object(readiness.shutil,'which',side_effect=lambda name:name), \
+                with patch.object(readiness,'which',side_effect=lambda name:name), \
                      patch.object(readiness,'_run',side_effect=self.run_tool) as run:
                     result=readiness.transcribe(source,self.model)
                 self.assertTrue(result['audio_converted'])
@@ -59,7 +59,7 @@ class TranscriptionFormatTests(unittest.TestCase):
 
     def test_unsupported_audio_explains_conversion_dependency(self):
         source=self.wav(rate=48000)
-        with patch.object(readiness.shutil,'which',side_effect=lambda name:'whisper-cli' if name=='whisper-cli' else None), \
+        with patch.object(readiness,'which',side_effect=lambda name:'whisper-cli' if name=='whisper-cli' else None), \
              patch.object(readiness,'_run') as run, \
              self.assertRaisesRegex(RuntimeError,'ffmpeg is required to convert'):
             readiness.transcribe(source,self.model)

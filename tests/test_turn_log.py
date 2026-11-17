@@ -1,6 +1,7 @@
 import contextlib
 import io
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -32,7 +33,8 @@ class TurnLogTests(unittest.TestCase):
         plan = {"planner": "grok", "parameter_changes": [{"joint": "elbow_flex", "target": -10}], "executed_actions": 0}
         with tempfile.TemporaryDirectory() as directory:
             records = self.run_turn(lambda text: plan, directory)
-            self.assertEqual(Path(directory, "session.jsonl").stat().st_mode & 0o777, 0o600)
+            if os.name != "nt":
+                self.assertEqual(Path(directory, "session.jsonl").stat().st_mode & 0o777, 0o600)
         self.assertEqual([r["event"] for r in records], ["recording_stopped", "transcript", "planner_started", "result"])
         self.assertEqual(records[0]["audio_file"], "command.wav")
         result = records[-1]["result"]

@@ -127,6 +127,7 @@ class NativeTests(unittest.TestCase):
         Follower.get_observation.__wrapped__.return_value={}
         self.assertEqual(follower.get_observation(),{})
 
+    @unittest.skipUnless(sys.platform == 'darwin', 'launchd is macOS-only')
     def test_activation_refuses_connected_arm_before_changing_any_services(self):
         modules={'serial.tools':SimpleNamespace(list_ports=SimpleNamespace(comports=lambda:[]))}
         real_exists=Path.exists
@@ -137,6 +138,7 @@ class NativeTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError,'Disconnect the arm'):native.activate()
             call.assert_not_called()
 
+    @unittest.skipUnless(sys.platform == 'darwin', 'launchd is macOS-only')
     def test_switch_stops_old_owners_before_starting_native_and_records_rollback(self):
         commands=[]
         def call(args,**kwargs):
@@ -157,6 +159,7 @@ class NativeTests(unittest.TestCase):
         self.assertTrue(state['container_running'])
         self.assertEqual(state['stage'],'native_started')
 
+    @unittest.skipUnless(sys.platform == 'darwin', 'launchd is macOS-only')
     def test_rollback_restores_original_restart_policy_and_service_enabled_state(self):
         state=dict(stage='native_started',container='old-driver',container_running=True,
             restart_policy={'Name':'unless-stopped','MaximumRetryCount':0},

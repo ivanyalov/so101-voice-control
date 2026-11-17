@@ -13,13 +13,34 @@ import time
 import wave
 
 ROOT = Path(__file__).resolve().parents[1]
+TOOLS = ROOT / ".tools"
+
+
+def which(name: str) -> str | None:
+    """Prefer tools unpacked beside the checkout, then PATH."""
+    names = [name]
+    if os.name == "nt" and not name.lower().endswith(".exe"):
+        names.append(name + ".exe")
+    for base in (TOOLS / "whisper" / "Release", TOOLS / "whisper",
+                 TOOLS / "ffmpeg" / "bin", TOOLS / "ffmpeg"):
+        for candidate in names:
+            path = base / candidate
+            if path.is_file():
+                return str(path)
+    return shutil.which(name)
+
+
 def _run(args: list[str], timeout: int = 120) -> None:
-    result = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    result = subprocess.run(args, capture_output=True, text=True, timeout=timeout,
+                            encoding="utf-8", errors="replace")
     if result.returncode:
         raise RuntimeError(f"{Path(args[0]).name} failed: {result.stderr[-600:]}")
 
 
 def synthesize(text: str, output: Path | None = None) -> None:
+    if os.name == "nt":
+        _synthesize_windows(text, output)
+        return
     executable = shutil.which("say")
     if not executable:
         raise RuntimeError("macOS say is unavailable; configure a TTS adapter on this OS.")
@@ -34,6 +55,42 @@ def synthesize(text: str, output: Path | None = None) -> None:
         _run(args)
 
 
+WINDOWS_SPEECH = r"""
+param([string]$TextFile, [string]$Voice = '', [string]$OutFile = '')
+Add-Type -AssemblyName System.Speech
+$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
+$text = Get-Content -Raw -LiteralPath $TextFile
+if ($Voice) { try { $synth.SelectVoice($Voice) } catch { } }
+if ($OutFile) {
+    $format = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(16000,
+        [System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen,
+        [System.Speech.AudioFormat.AudioChannel]::Mono)
+    $synth.SetOutputToWaveFile($OutFile, $format)
+}
+$synth.Speak($text)
+$synth.Dispose()
+"""
+
+
+def _synthesize_windows(text: str, output: Path | None) -> None:
+    """System.Speech writes 16 kHz mono PCM WAV, directly readable by whisper.cpp."""
+    powershell = shutil.which("powershell") or shutil.which("pwsh")
+    if not powershell:
+        raise RuntimeError("PowerShell is required for Windows text-to-speech.")
+    with tempfile.TemporaryDirectory(prefix="so101-tts-") as directory:
+        source = Path(directory) / "reply.txt"
+        source.write_text(text, encoding="utf-8")
+        script = Path(directory) / "speak.ps1"
+        script.write_text(WINDOWS_SPEECH, encoding="utf-8")
+        out = ""
+        if output is not None:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            out = str(output)
+        _run([powershell, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+              "-File", str(script), "-TextFile", str(source),
+              "-Voice", os.getenv("TTS_VOICE", ""), "-OutFile", out])
+
+
 def resolve_model(model: Path | None = None) -> Path:
     path = model or Path(os.getenv("WHISPER_MODEL_PATH", "models/whisper/ggml-tiny.en-q5_1.bin"))
     path = path.expanduser()
@@ -45,7 +102,7 @@ def resolve_model(model: Path | None = None) -> Path:
 
 
 def transcribe(audio: Path, model: Path | None = None) -> dict:
-    executable = shutil.which("whisper-cli")
+    executable = which("whisper-cli")
     if not executable:
         raise RuntimeError("whisper-cli is required for this local STT adapter.")
     if not audio.is_file():
@@ -57,7 +114,7 @@ def transcribe(audio: Path, model: Path | None = None) -> dict:
         prefix = Path(directory) / "transcript"
         converted = not whisper_ready_wav(audio)
         if converted:
-            ffmpeg = shutil.which("ffmpeg")
+            ffmpeg = which("ffmpeg")
             if not ffmpeg:
                 raise RuntimeError("ffmpeg is required to convert this audio format.")
             wav = Path(directory) / "input.wav"
