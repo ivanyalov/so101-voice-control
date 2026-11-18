@@ -20,7 +20,8 @@ def load_environment():
 
 
 def doctor():
-    print(f'Python: {sys.version.split()[0]}')
+    import readiness
+    print(f'Python: {sys.version.split()[0]} on {sys.platform}')
     failures = []
     for package, module in {'httpx': 'httpx', 'numpy': 'numpy', 'sounddevice': 'sounddevice',
                             'soundfile': 'soundfile', 'python-dotenv': 'dotenv',
@@ -36,13 +37,28 @@ def doctor():
         print('FAIL pynput: package missing')
     else:
         print('OK pynput installed (keyboard hook not started)')
-    for name in ('whisper-cli', 'ffmpeg', 'say'):
-        if shutil.which(name):
-            print(f'OK local speech tool: {name}')
+    for name in ('whisper-cli', 'ffmpeg'):
+        found = readiness.which(name)
+        if found:
+            print(f'OK local speech tool: {name} ({found})')
+        elif name == 'ffmpeg':
+            # Recordings are already 16 kHz mono PCM, so conversion is optional.
+            print('WARN local speech tool missing: ffmpeg (only needed for other audio formats)')
         else:
             print(f'FAIL local speech tool missing: {name}')
             failures.append(name)
-    import readiness
+    if sys.platform == 'darwin':
+        if shutil.which('say'):
+            print('OK local speech tool: say')
+        else:
+            print('FAIL local speech tool missing: say')
+            failures.append('say')
+    elif sys.platform == 'win32':
+        if shutil.which('powershell') or shutil.which('pwsh'):
+            print('OK Windows text-to-speech: PowerShell System.Speech')
+        else:
+            print('FAIL Windows text-to-speech: PowerShell missing')
+            failures.append('PowerShell speech')
     try:
         print(f'OK Whisper model: {readiness.resolve_model().name}')
     except RuntimeError as exc:
@@ -72,7 +88,7 @@ def main():
     basic = sub.add_parser('command-preview', help='Offline basic command parser')
     basic.add_argument('text')
     sub.add_parser('speech-smoke', help='Synthetic speech transcription check, without microphone')
-    speak = sub.add_parser('speak', help='Speak text locally with macOS say')
+    speak = sub.add_parser('speak', help='Speak text locally (say on macOS, System.Speech on Windows)')
     speak.add_argument('text')
     transcript = sub.add_parser('transcribe', help='Transcribe an audio file locally')
     transcript.add_argument('audio', type=Path)

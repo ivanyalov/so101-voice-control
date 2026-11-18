@@ -129,9 +129,15 @@ class Console:
             return {'busy': self.busy, 'recording': self.recording, 'events': list(self.events), 'demo': self.demo}
 
     def launch(self, argv):
+        options = {}
+        if os.name == 'nt':
+            options['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP
+        environment = {**os.environ, 'PYTHONIOENCODING': 'utf-8', 'PYTHONUTF8': '1'}
         self.process = subprocess.Popen(argv, cwd=ROOT, stdin=subprocess.PIPE,
                                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                        text=True, bufsize=1, start_new_session=True)
+                                        text=True, encoding='utf-8', errors='replace',
+                                        bufsize=1, start_new_session=os.name != 'nt',
+                                        env=environment, **options)
         return self.process
 
     def submit(self, text='', preview=True, capture=False):
@@ -197,10 +203,18 @@ class Console:
             self.recording = False
             if process:
                 try:
-                    os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
+                    if os.name == 'nt':
+                        subprocess.run(['taskkill', '/F', '/T', '/PID', str(process.pid)],
+                                       capture_output=True)
+                    else:
+                        os.killpg(process.pid, signal.SIGKILL)
+                except (ProcessLookupError, FileNotFoundError):
                     pass
-                process.wait(timeout=5)
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
 
     def stop(self):
         with self.lock:

@@ -142,7 +142,8 @@ def configured_channel():
     from dotenv import load_dotenv
     from cyberwave import Cyberwave
     load_dotenv(ROOT / '.env', override=False)
-    config = Path(os.getenv('CYBERWAVE_EDGE_CONFIG_DIR', str(Path.home() / '.cyberwave'))).expanduser()
+    edge_dir = os.getenv('CYBERWAVE_EDGE_CONFIG_DIR')
+    config = Path(edge_dir).expanduser() if edge_dir else Path.home() / '.cyberwave'
     workspace = os.getenv('CYBERWAVE_WORKSPACE_ID')
     if not workspace:
         workspace = json.loads((config / 'environment.json').read_text())['workspace_uuid']
